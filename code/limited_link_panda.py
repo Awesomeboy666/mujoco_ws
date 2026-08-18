@@ -166,7 +166,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         print(
             "p =", np.round(data.xpos[body_id], 2),
         )
-
+        #hhhhhhhhhhhhh
         viewer.sync()
 
         time.sleep(model.opt.timestep)
