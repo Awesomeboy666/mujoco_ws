@@ -1,0 +1,4 @@
+.vscode/
+mujoco_menagerie/
+__pycache__/
+*.pyc
