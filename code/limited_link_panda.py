@@ -2,7 +2,7 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 import time
-
+import threading
 
 # 加载模型
 model = mujoco.MjModel.from_xml_path(
@@ -64,19 +64,54 @@ ki = 10.0
 
 int_e = np.zeros(7)
 
+print("x≈0.25 - 0.70 m,y≈−0.40∼0.40 m,z≈0.15∼0.75 m")
+x = float(input("请输入目标 x: "))
+y = float(input("请输入目标 y: "))
+z = float(input("请输入目标 z: "))
+p_posgoal_new = np.array([x, y, z])
+
+new_goal_ready = False
+input_goal = None
+show =True
+
+# 键盘输入线程
+def input_thread():
+    global new_goal_ready, input_goal,show
+    while True:
+        if show == False:
+            try:
+                print("x≈0.25 - 0.70 m,y≈−0.40∼0.40 m,z≈0.15∼0.75 m")
+                x = float(input("请输入目标 x: "))
+                y = float(input("请输入目标 y: "))
+                z = float(input("请输入目标 z: "))
+                input_goal = np.array([x, y, z])
+
+                new_goal_ready = True
+                show = True  # 已经收到新目标，先停止继续询问
+            except ValueError:
+                print("输入格式错误，请输入三个数字，例如：0.5 0.1 0.6")
+        else:
+            time.sleep(0.05)
+
+
+threading.Thread(
+    target=input_thread,
+    daemon=True
+).start()
 
 with mujoco.viewer.launch_passive(model, data) as viewer:
 
     while viewer.is_running():
-        if state == 2 :
-            print("x≈0.25 - 0.70 m,y≈−0.40∼0.40 m,z≈0.15∼0.75 m")
-            x = float(input("请输入目标 x: "))
-            y = float(input("请输入目标 y: "))
-            z = float(input("请输入目标 z: "))
-            p_posgoal_new = np.array([x, y, z])
+        if new_goal_ready:
+            p_posgoal_old = data.xpos[body_id].copy()  # 从当前实际位置重新规划
+            p_posgoal_new = input_goal.copy()
+
+            t = 0.0
             int_e[:] = 0.0
-            state = 1
-            t = 0
+
+            new_goal_ready = False
+            
+            
 
         t += model.opt.timestep
 
@@ -108,7 +143,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         e_pos = p_path - p
         v_cmd = kp_task * e_pos + p_path_vel
 
-        # 末端姿态控制
+        '''# 末端姿态控制   不要末端姿态控制了
         R = data.xmat[body_id].reshape(3, 3)  #reshape 是啥意思
 
         R_err = R_d.T @ R - R.T @ R_d
@@ -118,15 +153,15 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             R_err[0, 2],
             R_err[1, 0]
         ])
-        omega_cmd = -kp_rot * e_R
+        omega_cmd = -kp_rot * e_R'''
 
         # 任务空间速度
-        xvel_cmd = np.concatenate((v_cmd, omega_cmd))
+        #xvel_cmd = np.concatenate((v_cmd, omega_cmd))
 
         # 主任务逆运动学
-        J_pinv = np.linalg.pinv(J)
-        qvel_task = J_pinv @ xvel_cmd  # 主任务关节速度
-
+        J_pinv = np.linalg.pinv(Jp)
+        #qvel_task = J_pinv @ xvel_cmd  # 主任务关节速度
+        qvel_task = J_pinv @ v_cmd
 
         # 零空间关节限位回避
         q = data.qpos[:7]
@@ -135,7 +170,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
 
         qvel_null = -k_null * grad_H  # 沿负梯度方向运动
 
-        N = np.eye(7) - J_pinv @ J  # 零空间投影矩阵
+        N = np.eye(7) - J_pinv @ Jp  # 零空间投影矩阵
 
         qvel_d = qvel_task + N @ qvel_null  # 主任务 + 次任务
 
@@ -159,13 +194,14 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                             + (p_posgoal_new[2] - data.xpos[body_id][2])**2),0.5)
         
         if check_goal < 0.01:
-            state = 2
-            p_posgoal_old = data.xpos[body_id].copy()
-
-        # 打印观察
-        print(
-            "p =", np.round(data.xpos[body_id], 2),
-        )
+            show = False
+            
+            
+        if show == True:
+            # 打印观察
+            print(
+                "p =", np.round(data.xpos[body_id], 2),
+            )
 
         viewer.sync()
 
