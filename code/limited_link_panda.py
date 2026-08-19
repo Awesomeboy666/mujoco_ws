@@ -19,6 +19,7 @@ body_id = mujoco.mj_name2id(
 #雅可比矩阵缓冲区
 jacp = np.zeros((3, model.nv))
 jacr = np.zeros((3, model.nv))
+q0 = data.qpos[:7].copy()
 
 # 记录初始末端位姿
 R_d = data.xmat[body_id].reshape(3, 3).copy()
@@ -56,13 +57,18 @@ q_mid = (q_min + q_max) / 2.0
 
 k_null = 1.0  # 零空间关节限位回避增益
 state = 2 #1 is go  2 is wait
-T = 2
+T = 3
 t = 0
-# 关节速度 PI
-kp = 15.0
-ki = 10.0
 
+# 关节速度 PI
+kp = 20.0
+ki = 10.0
 int_e = np.zeros(7)
+
+# 关节位置 PD控制
+kd = 15.0
+e_old = 0.0
+qpos_d = q0.copy()
 
 print("x≈0.25 - 0.70 m,y≈−0.40∼0.40 m,z≈0.15∼0.75 m")
 x = float(input("请输入目标 x: "))
@@ -175,16 +181,22 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         qvel_d = qvel_task + N @ qvel_null  # 主任务 + 次任务
 
 
-        # 关节速度 PI
+        '''# 关节速度 PI
         e = qvel_d - data.qvel[:7]
-
         int_e += e * model.opt.timestep
-
         bias = data.qfrc_bias[:7].copy()
-
         tau = kp * e + ki * int_e + bias
+        data.ctrl[:7] = tau'''
 
+        #关节位置控制PD
+        qpos_d += qvel_d * model.opt.timestep
+        e = qpos_d - data.qpos[:7]
+        bias = data.qfrc_bias[:7].copy()
+        de_e = (e - e_old)/model.opt.timestep
+        e_old = e
+        tau = kp * e + kd * de_e + bias
         data.ctrl[:7] = tau
+        
 
         # 推进仿真
         mujoco.mj_step(model, data)
