@@ -31,7 +31,6 @@ p_posgoal_old = data.xpos[body_id].copy()
 kp_task = 2.0  # 末端位置反馈增益
 kp_rot = 2.0   # 末端姿态反馈增益
 
-
 # Panda 关节限位
 q_min = np.array([
     -2.8973,
