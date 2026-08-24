@@ -3,6 +3,9 @@ import mujoco.viewer
 import casadi as ca
 import numpy as np
 import time
+import rospy
+from geometry_msgs.msg import Point
+
 def quat_to_rot(quat):
     quat = np.asarray(quat, dtype=float)
     quat = quat / np.linalg.norm(quat)
@@ -108,13 +111,11 @@ def panda_fk(q):
     p = T[:3, 3]
 
     return p
-
+#加载mujoco模型
 model = mujoco.MjModel.from_xml_path(
     "../mujoco_menagerie/franka_emika_panda/scene_motor.xml"
 )
-
 data = mujoco.MjData(model)
-
 mujoco.mj_resetDataKeyframe(model, data, 0)
 mujoco.mj_forward(model, data)
 body_id = mujoco.mj_name2id(
@@ -122,6 +123,9 @@ body_id = mujoco.mj_name2id(
     mujoco.mjtObj.mjOBJ_BODY,
     "hand"
 )
+
+real_time = 0.0   #真实时间
+
 # MPC参数
 N = 50
 mpc_dt = 0.02
@@ -133,22 +137,22 @@ substeps = max(
 
 
 dt = substeps * model.opt.timestep
-
 opti = ca.Opti()
 # 未来状态 7个q和7个qdot
 X = opti.variable(14, N + 1)
 # 未来期望加速度  7个tau
 U = opti.variable(7, N)
-
 # 当前真实状态
 x0 = opti.parameter(14)
+
+
 # 目标状态
 xd = opti.parameter(3)
 
-opti.subject_to(
-    X[:, 0] == x0
+opti.subject_to(  #subject_to（）用于添加约束
+    X[:, 0] == x0   #让起点必须是机器人当前的真实状态
 )
-q_symbol = ca.MX.sym(
+q_symbol = ca.MX.sym(  #创建一个 7 维符号变量，用来定义正运动学函数，不是 opti 的决策变量
     "q",
     7
 )
@@ -156,15 +160,17 @@ q_symbol = ca.MX.sym(
 p_symbol = panda_fk(
     q_symbol
 )
-
-fk = ca.Function(
-    "fk",
+#创建一个名为 "fk" 的 CasADi 函数
+fk = ca.Function(  
+    "fk",          
     [q_symbol],
     [p_symbol]
 )
+#之后可以使用：
+#p_k = fk(qk)
 
 # 动力学约束
-for k in range(N):
+for k in range(N):   #循环并不是在仿真中运行预测，而是在一次性创建N组动力学约束。
     q = X[:7 , k]
     qdot = X[7:14, k]
     qddot = U[:7, k] 
@@ -177,11 +183,10 @@ for k in range(N):
         qdot_next
     )
 
-    opti.subject_to(
+    opti.subject_to(   #这些约束把 X 和 U 联系起来。否则求解器可以分别任意选择状态和控制量。
         X[:, k + 1] == x_next
     )
 
-Q = np.diag([1,1,1,1,1,1,1,1,1,1,1,1,1,1])
 
 R = np.diag([1,1,1,1,1,1,1])
 
@@ -190,6 +195,7 @@ O = np.diag([10,10,10])
 J = 0
 p_posgoal_new = np.zeros(3)
 
+#构建目标函数
 for k in range(N):
     qk = X[:7, k + 1]
 
@@ -220,9 +226,9 @@ for i in range(7):
             acc_max[i]
         )
     )
-
+#指定目标函数
 opti.minimize(J)
-
+#配置 IPOPT 求解器
 opti.solver(
     "ipopt",
     {
@@ -250,6 +256,22 @@ M = np.zeros(
 )
 
 first_solve = True
+#
+def target_callback(msg):
+    global p_posgoal_new
+
+    p_posgoal_new = np.array([
+        msg.x,
+        msg.y,
+        msg.z
+    ])
+rospy.init_node("panda_mpc_controller")
+
+rospy.Subscriber(
+    "/target_position",
+    Point,
+    target_callback
+)
 
 with mujoco.viewer.launch_passive(model, data) as viewer:
 
@@ -261,7 +283,11 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             model,
             data
         )
-
+        opti.set_value(
+            xd,
+            p_posgoal_new
+        )
+        
         q_now = data.qpos[:7].copy()
         qdot_now = data.qvel[:7].copy()
 
@@ -363,8 +389,10 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
 
         print(
                 "p =",
-                np.round(data.xpos[body_id], 4)
+                np.round(data.xpos[body_id], 2)
             )
+        real_time += 0.02
+        print(real_time)
 
         viewer.sync()
 
