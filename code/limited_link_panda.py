@@ -3,6 +3,12 @@ import mujoco.viewer
 import numpy as np
 import time
 import threading
+#知识点：mujoco中雅可比矩阵的提取
+#       threading做多线程，五次多项式轨迹规划，逆运动学
+#       零空间关节限位回避，内外双环控制器
+
+
+
 
 # 加载模型
 model = mujoco.MjModel.from_xml_path(

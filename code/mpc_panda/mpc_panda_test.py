@@ -5,7 +5,8 @@ import numpy as np
 import time
 import rospy
 from geometry_msgs.msg import Point
-
+#知识点：正运动学，MPC
+#       casadi做MPC框架 ，逆向机械臂动力学做底层控制器
 def quat_to_rot(quat):
     quat = np.asarray(quat, dtype=float)
     quat = quat / np.linalg.norm(quat)

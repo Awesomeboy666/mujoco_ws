@@ -2,6 +2,8 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 import time
+#知识点：mujoco模型载入，mujoco常见用法命令
+#       逆运动学，速度误差的KI控制
 
 model = mujoco.MjModel.from_xml_path(
     "../mujoco_menagerie/franka_emika_panda/scene_motor.xml"
