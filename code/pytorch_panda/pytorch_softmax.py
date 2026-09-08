@@ -57,7 +57,7 @@ net.apply(init_weights)
 
 # ==================== 模块四：定义损失函数和优化器 ====================
 
-# CrossEntropyLoss 用于多分类任务，内部已经组合了 Softmax 和交叉熵。
+# CrossEntropyLoss 用于多分类任务，内部已经组合了 Softmax 和交叉熵(cost function)。
 # 因此模型末尾不能再添加 nn.Softmax，应直接传入原始类别分数 logits。
 loss = nn.CrossEntropyLoss()
 

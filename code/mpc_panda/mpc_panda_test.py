@@ -114,7 +114,7 @@ def panda_fk(q):
     return p
 #加载mujoco模型
 model = mujoco.MjModel.from_xml_path(
-    "../mujoco_menagerie/franka_emika_panda/scene_motor.xml"
+    "/home/xu/mujoco_ws/mujoco_menagerie/franka_emika_panda/scene_motor.xml"
 )
 data = mujoco.MjData(model)
 mujoco.mj_resetDataKeyframe(model, data, 0)
