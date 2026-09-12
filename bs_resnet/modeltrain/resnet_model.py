@@ -36,8 +36,9 @@ class Residual(nn.Module):
         return self.shortcut(X) + Y
 
 
-class TrafficResNet(nn.Module):
-    """用一维残差网络直接进行多步车流量预测。"""
+class TrafficResNet(nn.Module):   #PyTorch 中，一个网络通常写成继承 nn.Module 的类
+    """用一维残差网络直接进行多步车流量预测。
+    __init__ 是准备计算工具,forward 是规定计算过程。"""
 
     def __init__(self, input_steps=12, predict_steps=6):
         super().__init__()
@@ -46,8 +47,8 @@ class TrafficResNet(nn.Module):
         # 初步提取特征：[B, 2, 12] -> [B, 32, 12]。
         self.input_conv = nn.Conv1d(2, 32, kernel_size=3, padding=1)
 
-        # 三个块结构相同，但各自拥有独立的参数。
-        self.residual_blocks = nn.Sequential(
+        # 三个块结构相同，但各自拥有独立的参数。nn.Sequential 可以理解成：把里面的几个模块首尾接起来。
+        self.residual_blocks = nn.Sequential( 
             Residual(32, 32),
             Residual(32, 32),
             Residual(32, 32),
@@ -76,7 +77,7 @@ class TrafficResNet(nn.Module):
         return self.fc2(X)                     # [B, 6]
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":#只有直接运行这个文件时才会执行以下行
     # 随机输入只检查计算能否正常执行，不表示训练或预测效果。
     model = TrafficResNet(input_steps=12, predict_steps=6)
     model.eval()
